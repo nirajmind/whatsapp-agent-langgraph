@@ -1,0 +1,257 @@
+# .github/workflows/deploy-local-k8s.yaml
+name: Deploy to Local Kubernetes (Kind) - Using Makefile
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [windows-latest] # Adjust if you have specific OS requirements
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch the entire history
+
+      # --- CRITICAL FIX: Windows/PowerShell commands for Pruning ---
+      #- name: Prune Docker system (Early and Aggressive Cleanup)
+      #  run: |
+      #    Write-Host "Early Cleanup: Disk space before:"
+          # Get-PSDrive for general drive info (like 'df -h')
+      #    Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize
+          
+          # Remove-Item for file/directory deletion (like 'rm -rf')
+          # $env:TEMP is the Windows equivalent of /tmp
+      #    Remove-Item -Path "$env:TEMP\*" -Recurse -Force -ErrorAction SilentlyContinue
+      #    Remove-Item -Path "C:\Windows\Temp\*" -Recurse -Force -ErrorAction SilentlyContinue
+          
+          # Docker commands are generally cross-platform and should work
+      #    docker system prune -af
+      #    docker builder prune -af
+          
+      #    Write-Host "Early Cleanup: Disk space after:"
+      #    Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize
+      #  shell: powershell # Explicitly tells GitHub Actions to use PowerShell
+      # --- END CRITICAL FIX ---
+
+#      - name: Set up Docker Buildx # Still good practice for multi-arch builds if needed
+#        uses: docker/setup-buildx-action@v3
+#        with:
+#          platforms: linux/amd64 # Adjust based on your needs
+          # --- CRITICAL FIX: Specify a known-good BuildKit image ---
+          # 'buildkitd-flags: --containerd-worker-snapshotter=overlayfs --oci-worker-net=host' are common flags for Windows/WSL2
+          # 'moby/buildkit:latest' or 'moby/buildkit:buildx-stable' might work.
+          # Let's try a stable Linux-oriented tag for buildkitd itself.
+#          buildkitd-flags: --debug --oci-worker-net=host --oci-worker-snapshotter=overlayfs --containerd-worker-image moby/buildkit:buildx-stable
+          # Or simply target the Linux builder explicitly if the action supports it directly:
+          # builder: default
+          # driver-opts: |
+          #   image=moby/buildkit:latest
+          #   platform=linux/amd64
+          # Driver options are preferred for setting the image if you just want to swap.
+          # Let's use the explicit 'driver-opts' for the builder.
+#          driver: docker
+#          driver-opts: |
+#            image=moby/buildkit:latest
+          #  platform=linux/amd64
+          # If the above fails, you can try to specify a driver like 'docker-container' and then the image.
+          # driver: docker-container
+          # buildkitd-image: moby/buildkit:latest
+          # buildkitd-flags: "--debug" # For more verbose logs
+          # --- END CRITICAL FIX ---
+
+      # --- CRITICAL FIX: Create .env file from GitHub Secrets ---
+      - name: Create .env file
+        run: |
+          Write-Host "GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}" >> .env
+          Write-Host "ELEVENLABS_API_KEY=${{ secrets.ELEVENLABS_API_KEY }}" >> .env
+          Write-Host "ELEVENLABS_VOICE_ID=${{ secrets.ELEVENLABS_VOICE_ID }}" >> .env
+          Write-Host "TOGETHER_API_KEY=${{ secrets.TOGETHER_API_KEY }}" >> .env
+          Write-Host "WHATSAPP_TOKEN=${{ secrets.WHATSAPP_TOKEN }}" >> .env
+          Write-Host "WHATSAPP_PHONE_NUMBER_ID=${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}" >> .env
+          Write-Host "WHATSAPP_VERIFY_TOKEN=${{ secrets.WHATSAPP_VERIFY_TOKEN }}" >> .env
+          Write-Host "MONGO_URI=${{ secrets.MONGO_URI }}" >> .env
+          Write-Host "DATABASE_NAME=${{ vars.DATABASE_NAME }}" >> .env # Assuming non-sensitive variable from GitHub Actions Variables
+          Write-Host "COLLECTION_NAME=${{ vars.COLLECTION_NAME }}" >> .env # Assuming non-sensitive variable from GitHub Actions Variables
+          Write-Host "TEXT_MODEL_NAME=${{ vars.TEXT_MODEL_NAME }}" >> .env
+          Write-Host "EMBEDDER_NAME=${{ vars.EMBEDDER_NAME }}" >> .env
+          # Add all other variables from your .env.example file here
+        env:
+          # Ensure all secrets are defined in your GitHub Repository Secrets
+          # Ensure non-sensitive variables are defined in GitHub Repository Variables
+          # Access secrets using ${{ secrets.<SECRET_NAME> }}
+          # Access variables using ${{ vars.<VAR_NAME> }} (for non-sensitive vars)
+          # These are not directly consumed by 'Write-Host' but tell GitHub Actions that these values are needed.
+          # The run command itself accesses them directly.
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          ELEVENLABS_VOICE_ID: ${{ secrets.ELEVENLABS_VOICE_ID }}
+          TOGETHER_API_KEY: ${{ secrets.TOGETHER_API_KEY }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_PHONE_NUMBER_ID: ${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          DATABASE_NAME: ${{ vars.DATABASE_NAME }} # Example: if you have a non-secret DB_NAME
+          COLLECTION_NAME: ${{ vars.COLLECTION_NAME }} # Example
+          TEXT_MODEL_NAME: ${{ vars.TEXT_MODEL_NAME }}
+          EMBEDDER_NAME: ${{ vars.EMBEDDER_NAME }}
+      # --- END CRITICAL FIX ---  
+
+      #- name: Set up Kind Cluster # <--- CRITICAL FIX: Make Kind binary download robust ---
+        # This step now focuses on getting the KIND CLI binary (kind.exe)
+        # and kubectl. Node image is specified, but the binary download is manual for robustness.
+      #  run: |
+      #    $KIND_CLI_VERSION = "v0.29.0" # Ensure this matches the desired Kind CLI version
+      #    $KIND_INSTALL_DIR = "$env:HOMEDRIVE\nadhi\.kind\bin" # Standard install dir
+      #    $KIND_URL = "https://github.com/kubernetes-sigs/kind/releases/download/v0.29.0/kind-windows-amd64"
+          
+      #    Write-Host "Creating KIND install directory: $KIND_INSTALL_DIR"
+      #    New-Item -ItemType Directory -Force -Path $KIND_INSTALL_DIR
+          
+      #    Write-Host "Downloading KIND binary from: $KIND_URL"
+          
+          # --- Robust download with retries and timeout ---
+      #    $MaxRetries = 5
+      #    $DelaySeconds = 5
+      #    for ($i = 0; $i -lt $MaxRetries; $i++) {
+      #        try {
+                  # Use Invoke-WebRequest with increased timeout
+      #            Invoke-WebRequest -Uri $KIND_URL -OutFile "$KIND_INSTALL_DIR\kind.exe" -TimeoutSec 300 # 5 minutes timeout
+      #            Write-Host "KIND binary downloaded successfully on attempt $($i + 1)."
+      #            break
+      #        } catch {
+      #            Write-Host "Download failed on attempt $($i + 1): $($_.Exception.Message)"
+      #            if ($i -lt ($MaxRetries - 1)) {
+      #                Write-Host "Retrying in $DelaySeconds seconds..."
+      #                Start-Sleep -Seconds $DelaySeconds
+      #            } else {
+      #                throw "Failed to download KIND binary after $MaxRetries attempts."
+      #            }
+      #        }
+      #    }
+          # --- End robust download ---
+
+          # Add kind.exe to PATH for this job
+      #    echo "$KIND_INSTALL_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      #    kind version # Verify KIND installation
+      #    kubectl version --client # Verify kubectl installation
+          # --- CRITICAL FIX: Create the Kind cluster ---
+      #    $NODE_IMAGE = "kindest/node:v1.30.13" # Use the KUBECTL_VERSION for node image
+      #    Write-Host "Creating Kind cluster: kind create cluster --name kind --image $NODE_IMAGE"
+      #    kind create cluster --name kind --image $NODE_IMAGE
+      #    Write-Host "Kind cluster created."
+          # --- END CRITICAL FIX ---
+      #  shell: powershell # Explicitly tells GitHub Actions to use PowerShell  
+
+      #- name: Set up Kind Cluster
+      #  uses: helm/kind-action@v1.12.0
+      #  with:
+      #    node_image: kindest/node:v1.28.0
+          #kind-binary-os: windows
+          #kind-binary-arch: amd64  
+
+#      - name: Build Docker Images with Makefile
+#        run: |
+          # Ensure docker-compose is installed on the runner if needed
+          # (GitHub Actions runners usually have it, but good to note)
+          
+          # Build all service images defined in docker-compose.yml
+#          make ava-run
+#        env:
+          # Pass any ENV variables that your Dockerfiles might need during build
+          # E.g., for HF_MODELS_TO_DOWNLOAD and HF_HOME
+          # ,openai/whisper-1"
+#          HF_MODELS_TO_DOWNLOAD: "sentence-transformers/all-MiniLM-L6-v2"
+#          HF_HOME: "/app/hf_cache"
+
+      - name: Load Docker Images into Kind Cluster
+        run: |
+          # Get the names of the images built by docker compose
+          # This assumes your docker-compose.yml uses specific image names/tags
+          # For example, if services are named 'whatsapp' and 'chainlit'
+          # and Dockerfile uses 'FROM python:...' they might be tagged as 'projectname-servicename:latest'
+          # You might need to inspect 'docker images' output after 'make ava-build'
+          
+          # Replace 'your-service-name' with the actual service names from your docker-compose.yml
+          # and 'your-image-tag' with the tags Docker Compose uses (often projectname-servicename)
+          
+          # Example (adjust based on your actual Docker Compose service names/tags):
+          #HF_DOWNLOADER_IMAGE_TAG=$(docker images -q | grep hf_models_downloader | head -n 1) 
+          # Find the exact tag
+          #EMBEDDING_SERVICE_IMAGE_TAG=$(docker images -q | grep embedding_service | head -n 1)
+          # Assuming the WhatsApp Webhook service is named 'whatsapp' in your docker-compose.yml
+          # and the Chainlit UI service is named 'chainlit'
+          #WHATSAPP_WEBHOOK_IMAGE_TAG=$(docker images -q | grep whatsapp | head -n 1) 
+          # Assuming projectname-servicename
+          #CHAINLIT_UI_IMAGE_TAG=$(docker images -q | grep chainlit | head -n 1) 
+          # Assuming projectname-servicename
+
+          $COMPOSE_PROJECT_NAME = $env:COMPOSE_PROJECT_NAME
+          $HF_DOWNLOADER_IMAGE_TAG = "${COMPOSE_PROJECT_NAME}-hf_models_downloader:latest"
+          $WHATSAPP_WEBHOOK_IMAGE_TAG = "${COMPOSE_PROJECT_NAME}-whatsapp:latest"
+          $CHAINLIT_UI_IMAGE_TAG = "${COMPOSE_PROJECT_NAME}-chainlit:latest"
+
+          Write-Host "Detected images from Makefile build:"
+          Write-Host "HF Downloader: ${HF_DOWNLOADER_IMAGE_TAG}"
+          Write-Host "WhatsApp Webhook: ${WHATSAPP_WEBHOOK_IMAGE_TAG}"
+          Write-Host "Chainlit UI: ${CHAINLIT_UI_IMAGE_TAG}"
+
+          # Load images into Kind cluster
+          kind load docker-image ${HF_DOWNLOADER_IMAGE_TAG} --name kind-control-plane --image-pull-policy Never
+          kind load docker-image ${WHATSAPP_WEBHOOK_IMAGE_TAG} --name kind-control-plane --image-pull-policy Never
+          kind load docker-image ${CHAINLIT_UI_IMAGE_TAG} --name kind-control-plane --image-pull-policy Never
+        shell: powershell # Explicitly tells GitHub Actions to use PowerShell
+        env:
+          # Ensure any specific tags or registry prefixes used in your docker-compose.yml are defined
+          COMPOSE_PROJECT_NAME: ava-whatsapp-agent-course # Example, if your docker-compose.yml defines this
+
+      - name: Deploy Kubernetes Resources
+        run: |
+          Write-Host "Applying Kubernetes manifests..."
+          kubectl apply -f 01-volumes.yaml
+          # Create secrets from GitHub Secrets (example, adjust for all your secrets)
+          kubectl create secret generic app-secrets \
+            --from-literal=GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+            --from-literal=ELEVENLABS_API_KEY="${{ secrets.ELEVENLABS_API_KEY }}" \
+            --from-literal=ELEVENLABS_VOICE_ID="${{ secrets.ELEVENLABS_VOICE_ID }}" \
+            --from-literal=TOGETHER_API_KEY="${{ secrets.TOGETHER_API_KEY }}" \
+            --from-literal=WHATSAPP_TOKEN="${{ secrets.WHATSAPP_TOKEN }}" \
+            --from-literal=WHATSAPP_PHONE_NUMBER_ID="${{ secrets.WHATSAPP_PHONE_NUMBER_ID }}" \
+            --from-literal=WHATSAPP_VERIFY_TOKEN="${{ secrets.WHATSAPP_VERIFY_TOKEN }}" \
+            --from-literal=MONGO_URI="${{ secrets.MONGO_URI }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          kubectl apply -f 03-configmaps.yaml
+
+          # Apply the HF model downloader Job
+          kubectl apply -f 04-hf-model-downloader-job.yaml
+          kubectl wait --for=condition=complete job/hf-model-downloader --timeout=5m
+
+          # Apply Deployments and Services for your application components
+          kubectl apply -f 06-whatsapp-webhook.yaml
+          kubectl apply -f 07-chainlit-ui.yaml
+
+          Write-Host "Deployment complete!"
+        shell: powershell # Explicitly tells GitHub Actions to use PowerShell  
+
+      - name: Get Pods Status (for debugging)
+        if: always()
+        run: kubectl get pods -o wide
+        shell: powershell # Explicitly tells GitHub Actions to use PowerShell
+
+      - name: Get Service Status (for debugging)
+        if: always()
+        run: kubectl get svc -o wide
+        shell: powershell # Explicitly tells GitHub Actions to use PowerShell
+
+      - name: Get Job Status (for debugging)
+        if: always()
+        run: kubectl get jobs -o wide
+        shell: powershell # Explicitly tells GitHub Actions to use PowerShell

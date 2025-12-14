@@ -1,0 +1,57 @@
+services:
+  # New service for Hugging Face Models
+  #hf_models_downloader:
+  #  build:
+  #    context: .
+  #    dockerfile: Dockerfile.hf_models # Points to your new Dockerfile
+  #    platforms: 
+  #      - linux/amd64 # Ensure compatibility with your architecture
+    # This service should run once to download models, then exit or stay alive for cache sharing
+    # If it's just for building cache, you don't need ports or restart policies
+  #  image: ${COMPOSE_PROJECT_NAME}_hf_models_downloader:${VERSION:-latest}
+  #  volumes:
+      # Map a named volume to the cache directory inside the container
+  #    - hf_cache_volume:/app/hf_cache
+    # You might run this with 'docker compose run --rm hf_models_downloader' initially
+    # or ensure other services depend on it being 'healthy' or 'built'
+  chainlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.chainlit
+      platforms:
+        - linux/amd64 # Ensure compatibility with your architecture
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    image: ${COMPOSE_PROJECT_NAME}_chainlit:${VERSION:-latest}
+    volumes: 
+      - ./short_term_memory:/app/data
+#      - hf_cache_volume:/app/hf_cache
+#    depends_on:
+#      - hf_models_downloader  
+  whatsapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64 # Ensure compatibility with your architecture
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    image: ${COMPOSE_PROJECT_NAME}_whatsapp:${VERSION:-latest}  
+    restart: unless-stopped
+    volumes: 
+      - ./short_term_memory:/app/data
+#      - hf_cache_volume:/app/hf_cache
+#    depends_on:
+#      - hf_models_downloader
+
+# Define your named volumes (CRITICAL)
+volumes:
+#  hf_cache_volume: # This named volume will persist the downloaded models
+#    driver: local
+  short_term_memory: # This named volume will persist your app data (if not bind mount)
+    driver: local      

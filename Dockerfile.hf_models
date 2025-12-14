@@ -1,0 +1,41 @@
+# Dockerfile.hf_models
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app/hf_models
+
+# Ensure standard tools are available if needed
+RUN apt-get update && apt-get install -y --no-install-recommends git curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Set global environment variables *before* any dependency steps
+# This helps ensure consistency and caches correctly.
+ENV PYTHONUNBUFFERED=1
+ENV HF_HOME="/app/hf_cache" 
+# Set a known cache directory for HF models
+
+# Copy only the dependency lock file first. This changes less often than pyproject.toml
+# and ensures caching for initial dependency install.
+COPY uv.lock /app/hf_models/
+
+# Install huggingface_hub and transformers
+RUN pip install --no-cache-dir huggingface_hub transformers sentence-transformers
+# openai/whisper-large-v3,openai/clip-vit-base-patch32,openai/clip-vit-large-patch14
+
+# Define the models to download
+ENV HF_MODELS_TO_DOWNLOAD="sentence-transformers/all-MiniLM-L6-v2" 
+
+# Add any other models used by SentenceTransformer or ImageToText
+
+# --- CRITICAL FIX: Set HF_HOME explicitly for download location ---
+ENV HF_HOME="/app/hf_cache" 
+
+# Set a known cache directory
+# --- END CRITICAL FIX ---
+
+# --- CRITICAL FIX: Copy the script and run it ---
+COPY src/ai_companion/modules/hf_models/download_hf_models.py /app/hf_models/
+RUN python /app/hf_models/download_hf_models.py
+# --- END CRITICAL FIX ---
+
+# Set a volume for the cache, so it can be shared with other services
+# Ensure this matches HF_HOME
+VOLUME ["/app/hf_cache"]

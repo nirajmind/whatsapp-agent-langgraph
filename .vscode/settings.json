@@ -1,0 +1,8 @@
+{
+    "terminal.integrated.env.osx": {
+        "PYTHONPATH": "${workspaceFolder}/src"
+    },
+    "yaml.schemas": {
+        "kubernetes://schema/v1%40service": "file:///c%3A/Users/nadhi/source-repos/ava-whatsapp-agent-course/07-chainlit-ui.yaml"
+    },
+}

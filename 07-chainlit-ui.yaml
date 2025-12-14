@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chainlit-deployment
+  labels:
+    app: chainlit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chainlit
+  template:
+    metadata:
+      labels:
+        app: chainlit
+    spec:
+      volumes:
+        - name: hf-cache-storage # A new EmptyDir volume
+          persistentVolumeClaim:
+            claimName: hf-cache-pvc # Use the existing PVC for HF cache
+        - name: short-term-memory-storage
+          persistentVolumeClaim:
+            claimName: short-term-memory-pvc
+       
+      containers:
+      - name: chainlit
+        image: docker.io/library/ava-whatsapp-agent-course_chainlit:v1 # <--- IMPORTANT: EXACT IMAGE NAME
+        ports:
+        - containerPort: 8000 # Your webhook port
+        #env: # Pass HF_HOME for app runtime
+          # HF_HOME is now the mount path of the HostPath volume
+        #  - name: HF_HOME
+        #    value: "/sbert-models" # <--- CRITICAL: New mount path for SBERT models
+        #  - name: HF_HUB_OFFLINE # Ensure app operates offline
+        #    value: "1" # "1" means offline
+        volumeMounts:
+        - name: short-term-memory-storage
+          mountPath: /app/data # Mount for short_term_memory
+        - name: hf-cache-storage
+          mountPath: /hf-sentence-transformers # Mount for HF cache
+          readOnly: true # HF cache is typically read-only
+        envFrom:
+          - secretRef:
+              name: app-secrets
+          - configMapRef:
+              name: app-config
+        resources:
+          requests:
+            cpu: "2000m"
+            memory: "2Gi"
+          limits:
+            cpu: "3000m"
+            memory: "3Gi"
+      # Depends on internal services (embedding_service)
+      # No direct 'depends_on' in K8s Deployment. Rely on DNS and probes.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chainlit # DNS name for external access/internal routing
+spec:
+  selector:
+    app: chainlit
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      nodePort: 30000 # If using NodePort (for local testing with 'localhost:30000')
+  type: NodePort # Or LoadBalancer for cloud (if supported by Kind/cluster)

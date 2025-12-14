@@ -1,0 +1,18 @@
+# Dockerfile.init_model_downloader
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+# Install Python packages required by the download script
+RUN pip install --no-cache-dir huggingface_hub transformers sentence-transformers
+
+# Copy the Python script that downloads/moves models
+# Assume download_hf_models.py is in your project root for simple COPY
+COPY src/ai_companion/modules/hf_models/download_hf_models.py /app/download_hf_models.py
+
+# Set the entrypoint to directly run the script
+# The script expects HF_MODELS_TO_DOWNLOAD and HF_HOME as environment variables
+ENTRYPOINT ["python", "/app/download_hf_models.py"]
+
+# This image doesn't need to expose ports or define volumes here,
+# as those are handled by the pod spec that uses this initContainer.

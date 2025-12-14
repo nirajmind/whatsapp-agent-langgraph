@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sbert-downloader
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure # If the download fails, retry the Job
+      volumes:
+        - name: hf-cache-storage # Volume for the SBERT model
+          persistentVolumeClaim:
+            claimName: hf-cache-pvc
+      containers:
+      - name: sbert-downloader
+        image: python:3.12-slim-bookworm
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            pip install -U sentence-transformers
+            python -c "\
+            import os; \
+            import textwrap; \
+            from huggingface_hub import snapshot_download; \
+
+            # Define the Python code as a multi-line string with desired internal indentation
+            models_to_download_str = os.environ.get('HF_MODELS_TO_DOWNLOAD', ''); \
+            hf_cache_dir = os.environ.get('HF_HOME', '/root/.cache/huggingface/hub'); \ # Default cache dir
+
+            if not models_to_download_str: \
+                print("HF_MODELS_TO_DOWNLOAD environment variable not set. Skipping model download."); \
+                exit(); \
+
+            models = [m.strip() for m in models_to_download_str.split(',') if m.strip()]; \ 
+
+            for model_name in models: \
+              print(f'Downloading {model_name}...'); \
+              snapshot_download(repo_id=model_name, cache_dir=hf_cache_dir); \
+            print('All models downloaded.'); \"
+        env:
+          - name: HF_MODELS_TO_DOWNLOAD
+            value: "sentence-transformers/all-MiniLM-L6-v2" # Add more models as needed
+          - name: HF_HOME
+            value: "/data/hf_cache" # Ensure this matches the mount path in the deployment      
+        volumeMounts:
+          - mountPath: /data
+            name: hf-cache-storage
+  backoffLimit: 4

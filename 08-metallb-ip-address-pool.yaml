@@ -1,0 +1,20 @@
+# 08-metallb-ip-address-pool.yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: kind-metallb-ip-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 172.19.255.200-172.19.255.250 # <--- IMPORTANT: Adjust this IP range to match your Kind Docker network.
+  autoAssign: true
+  #avoidKubernetesDomination: true
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: kind-metallb-l2-advertisement
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - kind-metallb-ip-pool

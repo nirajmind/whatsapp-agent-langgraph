@@ -1,0 +1,55 @@
+# 01-volumes.yaml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: hf-cache-pv # Name this PV will be referred to in PVCs
+spec:
+  capacity:
+    storage: 50Gi # Adjust size based on your HF model needs (e.g., 50Gi, 100Gi, 200Gi)
+  accessModes:
+    - ReadOnlyMany # Use ReadWriteOnce if only one app container uses it at a time
+  hostPath:
+    path: /mnt/c/Users/nadhi/source-repos/python-executes/sentence-transformers/all-MiniLM-L6-v2
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual # Use 'manual' to match PVCs that specify this storage class
+---  
+
+# PersistentVolumeClaim for the Hugging Face model cache
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hf-cache-pvc # Name this PVC will be referred to in deployments
+spec:
+  accessModes:
+    - ReadOnlyMany # Typically sufficient if one app container uses it at a time
+                    # Use ReadWriteMany if multiple app replicas on different nodes need write access
+  resources:
+    requests:
+      storage: 50Gi # Adjust size based on your HF model needs (e.g., 50Gi, 100Gi, 200Gi)
+  storageClassName: manual # Use 'manual' to match PVCs that specify this storage class
+                             # Use 'kubectl get storageclass' to verify default in your Kind cluster.
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: manual # Name this StorageClass to match PVs and PVCs
+provisioner: k8s.io/minikube-hostpath
+volumeBindingMode: WaitForFirstConsumer # Ensures PV is bound only when a pod requests it
+reclaimPolicy: Retain # Keeps the PV after PVC deletion, useful for manual management
+---
+
+
+# PersistentVolumeClaim for the short-term memory (app data like generated_images)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: short-term-memory-pvc # Name this PVC will be referred to in deployments
+spec:
+  accessModes:
+    - ReadWriteOnce # Typically sufficient for single app instances
+  resources:
+    requests:
+      storage: 10Gi # Adjust size based on your app data/generated_images needs
+  storageClassName: standard # Use your cluster's default StorageClass

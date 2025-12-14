@@ -1,0 +1,17 @@
+# 03-configmaps.yaml
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config # This name must match what you reference in your Deployments
+data:
+  # Add all your non-sensitive environment variables here as key-value pairs
+  # These typically include things like:
+  DATABASE_NAME: "WhatsappRAGDB" # Example: "ai_companion_memory"
+  COLLECTION_NAME: "vector_2dsphere" # Example: "short_term_memory_collection"
+  #TEXT_MODEL_NAME: "gpt-4o" # Example: "grok-3-latest" or "llama3-8b-8192"
+  EMBEDDER_NAME: "sentence-transformers/all-MiniLM-L6-v2"
+  # Add other non-sensitive configurations from your .env.example
+  # For example:
+  # MY_APP_DEBUG_MODE: "true"
+  # MY_APP_LOG_LEVEL: "INFO"
