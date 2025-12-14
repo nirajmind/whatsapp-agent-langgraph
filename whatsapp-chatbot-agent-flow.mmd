@@ -1,0 +1,96 @@
+graph TB
+    subgraph "Client Interfaces"
+        WA["WhatsApp API"]
+        CL["Chainlit UI"]
+    end
+
+    subgraph "Webhook Layer"
+        WH["WhatsApp Webhook<br/>webhook_endpoint.py"]
+    end
+
+    subgraph "Chainlit App Layer"
+        APP["Chainlit App<br/>app.py"]
+        MSG["Message Handler<br/>on_message()"]
+        CHAT["Chat Session<br/>on_chat_start()"]
+    end
+
+    subgraph "Core Graph Orchestration"
+        ROUTER["Router Node<br/>Classify input type"]
+        WF["Workflow Selector<br/>select_workflow()"]
+    end
+
+    subgraph "Processing Nodes"
+        MEM_EX["Memory Extraction<br/>Extract from input"]
+        MEM_INJ["Memory Injection<br/>Inject context"]
+        CTX_INJ["Context Injection<br/>Add current activity"]
+        CONV["Conversation Node<br/>LLM inference"]
+        IMG["Image Node<br/>Text-to-Image"]
+        AUD["Audio Node<br/>Text-to-Speech"]
+        TOOL["Tool Node<br/>generate_ava_image()"]
+        SUM["Summarize Node<br/>Create memory"]
+    end
+
+    subgraph "Memory Management"
+        LTM["Long-term Memory<br/>MongoDB Vector Store"]
+        STM["Short-term Memory<br/>Session state"]
+        MM["Memory Manager<br/>memory_manager.py"]
+    end
+
+    subgraph "Module Processing"
+        IMG_PROC["Image Module<br/>text_to_image.py"]
+        SPEECH["Speech Module<br/>text_to_speech.py"]
+        STT["Speech-to-Text<br/>speech_to_text.py"]
+        IMG2TXT["Image-to-Text<br/>image_to_text.py"]
+    end
+
+    subgraph "Data Storage"
+        MONGO_APP["MongoDB<br/>Graph Checkpoints"]
+        MONGO_MEM["MongoDB<br/>Vector Store"]
+    end
+
+    subgraph "Response Management"
+        RESP["Response Handler<br/>whatsapp_response.py"]
+    end
+
+    WA -->|"Incoming Message"| WH
+    WH -->|"Process"| APP
+    CL -->|"Chat Input"| APP
+    APP -->|"Initialize"| CHAT
+    APP -->|"Message Event"| MSG
+    MSG -->|"Send to Graph"| ROUTER
+    ROUTER -->|"Classify"| WF
+    WF -->|"text"| CONV
+    WF -->|"image"| IMG
+    WF -->|"audio"| AUD
+    
+    CONV -->|"Extract insights"| MEM_EX
+    MEM_EX -->|"Store"| SUM
+    SUM -->|"Save memory"| MM
+    MM -->|"Vector store"| LTM
+    
+    MEM_INJ -->|"Get context"| LTM
+    CTX_INJ -->|"Get activity"| STM
+    
+    IMG -->|"Generate image"| TOOL
+    TOOL -->|"Call"| IMG_PROC
+    IMG_PROC -->|"Return image"| RESP
+    
+    AUD -->|"Generate speech"| SPEECH
+    SPEECH -->|"Return audio"| RESP
+    
+    CONV -->|"Send response"| RESP
+    RESP -->|"Send message"| WA
+    
+    ROUTER -->|"Save state"| MONGO_APP
+    LTM -->|"Store vectors"| MONGO_MEM
+    MM -->|"Query vectors"| MONGO_MEM
+    
+    MSG -->|"Extract audio"| STT
+    MSG -->|"Extract image"| IMG2TXT
+
+    style APP fill:#ff9999
+    style ROUTER fill:#99ccff
+    style CONV fill:#99ff99
+    style LTM fill:#ffcc99
+    style MONGO_APP fill:#cc99ff
+    style MONGO_MEM fill:#cc99ff

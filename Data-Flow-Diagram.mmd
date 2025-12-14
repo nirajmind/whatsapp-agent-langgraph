@@ -1,0 +1,96 @@
+graph LR
+    subgraph INPUT["📥 INPUT SOURCES"]
+        WA_MSG["WhatsApp Message"]
+        WA_IMG["WhatsApp Media"]
+        CL_INPUT["Chainlit Input"]
+    end
+
+    subgraph INGEST["🔄 INGESTION LAYER"]
+        WH_EP["Webhook Endpoint<br/>Parse & Validate"]
+        CL_APP["Chainlit App<br/>Session Handler"]
+    end
+
+    subgraph STATE["📊 STATE MANAGEMENT"]
+        ROUTER["Router Decision<br/>text/image/audio"]
+        STATE_STORAGE["LangGraph State<br/>messages, workflow"]
+    end
+
+    subgraph PROCESSING["⚙️ PROCESSING NODES"]
+        MEM_EX["Memory Extraction<br/>Extract Entities"]
+        CTX_INJ["Context Injection<br/>Add Current Activity"]
+        MEM_INJ["Memory Injection<br/>Query Vector DB"]
+        CONV["Conversation Node<br/>LLM Response"]
+        IMG["Image Node<br/>Text→Image"]
+        AUD["Audio Node<br/>Text→Speech"]
+    end
+
+    subgraph MEMORY["💾 MEMORY LAYER"]
+        VEC_STORE["Vector Store<br/>Embeddings"]
+        SESSION["Session State<br/>Thread Context"]
+        MONGO_CP["MongoDB<br/>Checkpoints"]
+    end
+
+    subgraph OUTPUT["📤 OUTPUT GENERATION"]
+        TEXT_RESP["Text Response"]
+        IMG_RESP["Image Buffer"]
+        AUD_RESP["Audio File"]
+    end
+
+    subgraph DELIVERY["🚀 DELIVERY LAYER"]
+        RESP_HANDLER["Response Handler<br/>Format & Send"]
+    end
+
+    subgraph ENDPOINTS["🎯 OUTPUT ENDPOINTS"]
+        WA_SEND["WhatsApp Send"]
+        CL_DISPLAY["Chainlit Display"]
+    end
+
+    WA_MSG -->|"JSON Payload"| WH_EP
+    WA_IMG -->|"Media URL"| WH_EP
+    CL_INPUT -->|"Message Event"| CL_APP
+    
+    WH_EP -->|"Extracted Data"| INGEST
+    CL_APP -->|"Session Data"| INGEST
+    
+    INGEST -->|"User Message"| ROUTER
+    ROUTER -->|"Classification"| STATE
+    STATE -->|"State Updated"| STATE_STORAGE
+    
+    STATE_STORAGE -->|"messages"| MEM_EX
+    STATE_STORAGE -->|"thread_id"| SESSION
+    
+    MEM_EX -->|"Entities"| CONV
+    CTX_INJ -->|"Activity"| CONV
+    MEM_INJ -->|"Context"| CONV
+    
+    VEC_STORE -->|"Similar Memories"| MEM_INJ
+    SESSION -->|"Chat History"| CONV
+    
+    STATE_STORAGE -->|"workflow=text"| CONV
+    STATE_STORAGE -->|"workflow=image"| IMG
+    STATE_STORAGE -->|"workflow=audio"| AUD
+    
+    CONV -->|"Generated Text"| TEXT_RESP
+    IMG -->|"Image Path"| IMG_RESP
+    AUD -->|"Audio Path"| AUD_RESP
+    
+    TEXT_RESP -->|"Response"| RESP_HANDLER
+    IMG_RESP -->|"Response"| RESP_HANDLER
+    AUD_RESP -->|"Response"| RESP_HANDLER
+    
+    CONV -->|"Summary"| VEC_STORE
+    RESP_HANDLER -->|"Format"| ENDPOINTS
+    ENDPOINTS -->|"HTTP POST"| WA_SEND
+    ENDPOINTS -->|"UI Update"| CL_DISPLAY
+    
+    ROUTER -->|"Checkpoint"| MONGO_CP
+    CONV -->|"Checkpoint"| MONGO_CP
+
+    style INPUT fill:#e1f5ff
+    style INGEST fill:#f3e5f5
+    style ROUTER fill:#fff3e0
+    style PROCESSING fill:#e8f5e9
+    style MEMORY fill:#fce4ec
+    style OUTPUT fill:#f1f8e9
+    style DELIVERY fill:#ede7f6
+    style ENDPOINTS fill:#e0f2f1

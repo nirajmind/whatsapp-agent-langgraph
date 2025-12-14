@@ -1,0 +1,74 @@
+sequenceDiagram
+    participant User as 👤 WhatsApp User
+    participant WA as WhatsApp API
+    participant Webhook as 🔗 Webhook Endpoint
+    participant Chainlit as 💬 Chainlit App
+    participant Router as 🎯 Router
+    participant Memory as 💾 Memory Manager
+    participant LLM as 🧠 LLM Node
+    participant ImageGen as 🎨 Image Generator
+    participant TTSpeech as 🔊 Text-to-Speech
+    participant MongoDB as 🗄️ MongoDB
+    participant Response as 📤 Response Handler
+
+    User->>WA: Send Message/Media
+    WA->>Webhook: POST /webhook<br/>(message payload)
+    
+    activate Webhook
+    Webhook->>Webhook: Parse & Validate<br/>Extract thread_id
+    Webhook->>MongoDB: Load Graph Checkpointer<br/>(get last state)
+    activate MongoDB
+    MongoDB-->>Webhook: Previous State
+    deactivate MongoDB
+    Webhook->>Router: Initialize Graph<br/>with restored state
+    deactivate Webhook
+    
+    activate Router
+    Router->>Router: Classify Message Type<br/>(text/image/audio)
+    
+    alt Message Type = Text
+        Router->>Memory: Extract Entities<br/>(NLP parsing)
+        activate Memory
+        Memory->>MongoDB: Query Vector Store<br/>(semantic search)
+        MongoDB-->>Memory: Similar Memories
+        Memory-->>Router: Extracted Context
+        deactivate Memory
+        
+        Router->>LLM: Prepare Prompt<br/>(+ character card + context)
+        activate LLM
+        LLM->>LLM: Generate Response<br/>(with tools)
+        LLM-->>Router: AI Response
+        deactivate LLM
+        
+        Router->>Memory: Store Summary<br/>(memory extraction)
+        Memory->>MongoDB: Save Vector Embedding
+        
+    else Message Type = Image
+        Router->>ImageGen: Generate Image<br/>(text-to-image)
+        activate ImageGen
+        ImageGen-->>Router: Image Buffer
+        deactivate ImageGen
+        
+    else Message Type = Audio
+        Router->>TTSpeech: Convert Text<br/>(text-to-speech)
+        activate TTSpeech
+        TTSpeech-->>Router: Audio File
+        deactivate TTSpeech
+    end
+    
+    Router->>MongoDB: Save Graph State<br/>(checkpoint)
+    activate MongoDB
+    MongoDB-->>Router: State Saved
+    deactivate MongoDB
+    
+    Router->>Response: Format Response<br/>(text/image/audio)
+    deactivate Router
+    
+    activate Response
+    Response->>WA: Send via WhatsApp<br/>(media/text)
+    deactivate Response
+    
+    WA->>User: Display Message<br/>in Chat
+    
+    Note over Chainlit: (Parallel: Chainlit UI also gets<br/>response via same graph)
+    Chainlit-->>User: Display in UI<br/>(if connected)
