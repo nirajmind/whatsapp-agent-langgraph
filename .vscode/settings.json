@@ -5,4 +5,12 @@
     "yaml.schemas": {
         "kubernetes://schema/v1%40service": "file:///c%3A/Users/nadhi/source-repos/ava-whatsapp-agent-course/07-chainlit-ui.yaml"
     },
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python-envs.pythonProjects": [],
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.linting.enabled": true,
+    "python.linting.pylanceEnabled": true,
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/src"
+    ]
 }

@@ -324,3 +324,4 @@ src/ai_companion/modules/memory/short_term/*.db
 long_term_memory/
 short_term_memory/
 *.tar
+02-secrets.yaml

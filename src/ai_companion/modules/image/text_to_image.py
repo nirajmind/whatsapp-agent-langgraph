@@ -4,10 +4,8 @@ import os
 import httpx
 from typing import Optional, List, Dict, Any
 from uuid import uuid4 # Import uuid4 directly for convenience
-
-from langchain.prompts import PromptTemplate # Assuming you use this for prompts internally
 from pydantic import BaseModel, Field
-from together import Together # For Together AI client
+from together import Together# For Together AI client
 
 from ai_companion.core.exceptions import TextToImageError
 from ai_companion.core.prompts import IMAGE_ENHANCEMENT_PROMPT, IMAGE_SCENARIO_PROMPT
